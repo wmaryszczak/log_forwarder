@@ -1,0 +1,13 @@
+Options["bucket_name"] = FileInfo.FullName.Split('/')[5];
+var fileSegments = FileInfo.FullName.Split('.');
+var lastIndex = fileSegments.Length - 1;
+if(fileSegments[lastIndex] == "gzip")
+{
+  Options["content_encoding"] = fileSegments[lastIndex];
+  Options["content_type"] = fileSegments[lastIndex - 1];
+}
+else
+{
+  Options["content_type"] = fileSegments[lastIndex];
+}
+Options["filename"] = new  System.IO.DirectoryInfo(FileInfo.DirectoryName).Name + '/' + FileInfo.Name;

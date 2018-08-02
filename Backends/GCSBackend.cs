@@ -8,18 +8,30 @@ namespace log_forwarder.Backends
   public class GCSBackend : IBackend
   {
     private readonly StorageClient client;
+    private readonly string bucket;
 
-    public GCSBackend()
+    public GCSBackend(string bucket)
     {
       this.client = this.client = StorageClient.Create();
+      this.bucket = bucket;
     }
 
-    public Task SendAsync(Stream stream, Dictionary<string, string> options)
+    public Task SendAsync(string fullPath, Dictionary<string, string> options)
     {
-      var bucketName = options["bucket"];
+      var bucketName = this.bucket ?? options["bucket"];
       var fileName = options["filename"];
-      var contentType = options["content_type"];
-      return client.UploadObjectAsync(bucketName, fileName, contentType, stream);
+      var ext = GetValue(options, "ext") ?? Path.GetExtension(fileName);
+      var contentType = GetValue(options, "content_type") ?? Atoms.MimeType.GetMimeType(ext);
+      return client.UploadObjectAsync(bucketName, fileName, contentType, File.OpenRead(fullPath));
+    }
+
+    private string GetValue(Dictionary<string, string> options, string key)
+    {
+      if(options.TryGetValue(key, out var val))
+      {
+        return val;
+      }
+      return null;
     }
   }
 }
