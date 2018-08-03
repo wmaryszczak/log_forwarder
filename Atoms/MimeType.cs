@@ -7,6 +7,7 @@ namespace log_forwarder.Atoms
   {
     private static Dictionary<string, string> mapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
+      {"txt", "text/plain"},
       {"json", "application/json"},
       {"xml", "text/xml"},
       {".htm", "text/html"},
@@ -21,7 +22,7 @@ namespace log_forwarder.Atoms
       {
         return val;
       }
-      return "text/plain";
+      return extension;
     }
   }
 }

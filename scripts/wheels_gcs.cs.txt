@@ -1,4 +1,4 @@
-Options["bucket_name"] = FileInfo.FullName.Split('/')[5];
+Options["bucket"] = FileInfo.FullName.Split('/')[5];
 var fileSegments = FileInfo.FullName.Split('.');
 var lastIndex = fileSegments.Length - 1;
 if(fileSegments[lastIndex] == "gzip")

@@ -8,6 +8,7 @@ using CommandLine;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using log_forwarder.Backends;
+using System.Threading;
 
 namespace log_forwarder
 {
@@ -19,6 +20,7 @@ namespace log_forwarder
 
   class Program
   {
+    private static readonly AutoResetEvent closing = new AutoResetEvent(false);
     private static IBackend backend;
     private static ScriptRunner<Dictionary<string, string>> scriptRunner;
     private static FileSystemWatcher watcher;
@@ -44,7 +46,8 @@ namespace log_forwarder
         CreteWatcher(options);
         ScanDirectories(options);
         Console.WriteLine($"watching for files is {options.Path} {options.Filter}");
-        Console.ReadKey();
+        Console.CancelKeyPress += new ConsoleCancelEventHandler(OnExit);
+        closing.WaitOne();
         watcher.EnableRaisingEvents = false;
       }
     }
@@ -92,18 +95,9 @@ namespace log_forwarder
     {
       if(e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
       {
+        Console.WriteLine($"start forward files from {e.FullPath}");
         var parent = Directory.GetParent(e.FullPath).ToString();
-
-        foreach(var file in Directory.GetFiles(parent))
-        {
-          var fi = new FileInfo(file);
-          if(fi.Length > 0)
-          {
-            var options = new Dictionary<string, string> { };
-            var tmp = scriptRunner(new Data { FileInfo = fi, Options = options }).Result;
-            Export(e.FullPath, options);
-          }
-        }
+        ExportAllFiles(parent);
       }
     }
 
@@ -111,70 +105,88 @@ namespace log_forwarder
     {
       if (!System.IO.Directory.Exists(options.Path))
       {
-        throw new ArgumentException();
+        throw new ArgumentException(options.Path);
       }
-      var dirs = new Stack<string>(20);
-      dirs.Push(options.Path);
-      while(dirs.Count > 0)
+      var subDirs = System.IO.Directory.GetDirectories(options.Path, "*", SearchOption.AllDirectories);
+      foreach(var currentDir in subDirs)
       {
-        var currentDir = dirs.Pop();
-        string[] subDirs;
+        ExportAllFiles(currentDir);
+      }
+    }
+
+    private static void ExportAllFiles(string currentDir)
+    {
+      string[] files = null;
+      var exportedFilesCounter = 0;
+      var exportComplete = true;
+      try
+      {
+        files = System.IO.Directory.GetFiles(currentDir);
+      }
+      catch (UnauthorizedAccessException e)
+      {
+        Console.Error.WriteLine(e);
+        return;
+      }
+      catch (System.IO.DirectoryNotFoundException e)
+      {
+        Console.Error.WriteLine(e);
+        return;
+      }
+      if(!files.Any(f => Path.GetExtension(f).EndsWith("complete")))
+      {
+        Console.Error.WriteLine($"skipping {currentDir} because is not ready for sending files.");
+        return;
+      }
+      foreach (string file in files)
+      {
         try
         {
-          subDirs = System.IO.Directory.GetDirectories(currentDir);
-        }
-        catch (UnauthorizedAccessException e)
-        {
-          Console.WriteLine(e.Message);
-          continue;
-        }
-        catch (System.IO.DirectoryNotFoundException e)
-        {
-          Console.WriteLine(e.Message);
-          continue;
-        }
-
-        string[] files = null;
-        try
-        {
-          files = System.IO.Directory.GetFiles(currentDir);
-        }
-        catch (UnauthorizedAccessException e)
-        {
-
-          Console.WriteLine(e.Message);
-          continue;
-        }
-        catch (System.IO.DirectoryNotFoundException e)
-        {
-          Console.WriteLine(e.Message);
-          continue;
-        }
-        foreach (string file in files)
-        {
-          try
+          var fi = new System.IO.FileInfo(file);
+          if(fi.Length > 0)
           {
-            var fi = new System.IO.FileInfo(file);
             var opts = new Dictionary<string, string> { };
             var tmp = scriptRunner(new Data { FileInfo = fi, Options = opts }).Result;
             Export(fi.FullName, opts);
-          }
-          catch (System.IO.FileNotFoundException e)
-          {
-            Console.WriteLine(e.Message);
-            continue;
+            File.Delete(fi.FullName);
+            exportedFilesCounter++;
           }
         }
-        foreach (string str in subDirs)
+        catch (System.IO.FileNotFoundException e)
         {
-          dirs.Push(str);
+          Console.Error.WriteLine(e);
+          exportComplete = false;
+          continue;
         }
+      }
+      Console.Write($"{exportedFilesCounter}/{files.Length} have been exported");
+      try
+      {
+        if(exportComplete)
+        {
+          Console.WriteLine($" and cleaned");
+          Directory.Delete(currentDir, true);
+        }
+        else
+        {
+          Console.WriteLine();
+        }
+      }
+      catch(Exception ex)
+      {
+        Console.Error.WriteLine(ex);
       }
     }
 
     private static void Export(string fullPath, Dictionary<string, string> options)
     {
-      backend.SendAsync(fullPath, options);
+      backend.Send(fullPath, options);
     }
+
+    private static void OnExit(object sender, ConsoleCancelEventArgs args)
+    {
+      Console.WriteLine("Exit");
+      closing.Set();
+    }    
   }
 }
