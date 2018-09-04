@@ -13,4 +13,8 @@
     <PackageReference Include="MongoDB.Driver" Version="2.7.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="scripts/*" CopyToPublishDirectory="Always" />
+  </ItemGroup>
+
 </Project>
