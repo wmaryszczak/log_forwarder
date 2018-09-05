@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using log_forwarder.Backends;
 using System.Threading;
+using System.Globalization;
 
 namespace log_forwarder
 {
@@ -45,9 +46,10 @@ namespace log_forwarder
         BuildScript(options);
         CreteWatcher(options);
         ScanDirectories(options);
-        Console.WriteLine($"watching for files is {options.Path} {options.Filter}");
+        Console.WriteLine($"start watching for files is {options.Path} {options.Filter}");
         Console.CancelKeyPress += new ConsoleCancelEventHandler(OnExit);
         closing.WaitOne();
+        Console.WriteLine($"stop watching for files is {options.Path} {options.Filter}");
         watcher.EnableRaisingEvents = false;
       }
     }
@@ -93,9 +95,9 @@ namespace log_forwarder
 
     private static void OnChanged(object sender, FileSystemEventArgs e)
     {
+      Console.WriteLine($"start forward files from {e.FullPath} because of {e.ChangeType.ToString()}");
       if(e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
       {
-        Console.WriteLine($"start forward files from {e.FullPath} because of {e.ChangeType.ToString()}");
         var parent = Directory.GetParent(e.FullPath).ToString();
         ExportAllFiles(parent);
       }
@@ -142,6 +144,7 @@ namespace log_forwarder
         Console.Error.WriteLine($"skipping {currentDir} because is not ready for sending files.");
         return;
       }
+      var dt = DateTime.UtcNow;
       foreach (string file in files)
       {
         try
@@ -163,7 +166,8 @@ namespace log_forwarder
           continue;
         }
       }
-      Console.Write($"{exportedFilesCounter}/{files.Length} have been exported");
+      var tt = (DateTime.UtcNow - dt).TotalMilliseconds.ToString(CultureInfo.InvariantCulture);
+      Console.Write($"{exportedFilesCounter}/{files.Length} have been exported in [{tt}] ms");
       try
       {
         if(exportComplete)
@@ -173,7 +177,7 @@ namespace log_forwarder
         }
         else
         {
-          Console.WriteLine();
+          Console.WriteLine($" and left incomplete");
         }
       }
       catch(Exception ex)
