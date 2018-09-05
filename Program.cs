@@ -95,7 +95,7 @@ namespace log_forwarder
     {
       if(e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
       {
-        Console.WriteLine($"start forward files from {e.FullPath}");
+        Console.WriteLine($"start forward files from {e.FullPath} because of {e.ChangeType.ToString()}");
         var parent = Directory.GetParent(e.FullPath).ToString();
         ExportAllFiles(parent);
       }
@@ -111,6 +111,7 @@ namespace log_forwarder
       foreach(var currentDir in subDirs)
       {
         ExportAllFiles(currentDir);
+        Console.Error.WriteLine($"skipping {currentDir} because is not ready for sending files.");
       }
     }
 
@@ -121,7 +122,10 @@ namespace log_forwarder
       var exportComplete = true;
       try
       {
-        files = System.IO.Directory.GetFiles(currentDir);
+        if(Directory.Exists(currentDir))
+        {
+          files = System.IO.Directory.GetFiles(currentDir);
+        }
       }
       catch (UnauthorizedAccessException e)
       {
