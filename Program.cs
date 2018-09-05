@@ -46,7 +46,7 @@ namespace log_forwarder
         });
         CreateBackend(options);
         BuildScript(options);
-        CreteWatcher(options);
+        CreateWatcher(options);
         ScanDirectories(options);
         Console.CancelKeyPress += new ConsoleCancelEventHandler(OnExit);
         Console.WriteLine($"start watching for files is {options.Path} {options.Filter}");
@@ -55,10 +55,11 @@ namespace log_forwarder
         }
         Console.WriteLine($"stop watching for files is {options.Path} {options.Filter}");
         watcher.EnableRaisingEvents = false;
+        watcher.Dispose();
       }
     }
 
-    private static void CreteWatcher(CommandlineOptions options)
+    private static void CreateWatcher(CommandlineOptions options)
     {
       watcher = new FileSystemWatcher(options.Path, options.Filter);
       watcher.InternalBufferSize = 1024 * 100;
@@ -67,6 +68,7 @@ namespace log_forwarder
       watcher.IncludeSubdirectories = true;
       watcher.Changed += new FileSystemEventHandler(OnChanged);
       watcher.Created += new FileSystemEventHandler(OnChanged);
+      watcher.Error += new ErrorEventHandler(WatcherError);
     }
 
     private static void BuildScript(CommandlineOptions options)
@@ -189,6 +191,12 @@ namespace log_forwarder
         Console.Error.WriteLine(ex);
       }
     }
+
+    private static void WatcherError(object sender, ErrorEventArgs e)
+    {
+      Console.Error.WriteLine(e.GetException());
+    }
+
 
     private static void Export(string fullPath, Dictionary<string, string> options)
     {
