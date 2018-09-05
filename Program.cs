@@ -145,6 +145,10 @@ namespace log_forwarder
         Console.Error.WriteLine(e);
         return;
       }
+      if(files == null || files.Length == 0)
+      {
+        return;
+      }
       if(!files.Any(f => Path.GetExtension(f).EndsWith("complete")))
       {
         Console.Error.WriteLine($"skipping {currentDir} because is not ready for sending files.");
