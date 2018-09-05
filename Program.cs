@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.Scripting;
 using log_forwarder.Backends;
 using System.Threading;
 using System.Globalization;
+using System.Runtime.Loader;
 
 namespace log_forwarder
 {
@@ -28,6 +29,7 @@ namespace log_forwarder
 
     static void Main(string[] args)
     {
+      AssemblyLoadContext.Default.Unloading += MethodInvokedOnSigTerm;
       var options = new CommandlineOptions { };
       var parser = new Parser((settings) =>
       {
@@ -46,9 +48,11 @@ namespace log_forwarder
         BuildScript(options);
         CreteWatcher(options);
         ScanDirectories(options);
-        Console.WriteLine($"start watching for files is {options.Path} {options.Filter}");
         Console.CancelKeyPress += new ConsoleCancelEventHandler(OnExit);
-        closing.WaitOne();
+        Console.WriteLine($"start watching for files is {options.Path} {options.Filter}");
+        while(!closing.WaitOne(10))
+        {          
+        }
         Console.WriteLine($"stop watching for files is {options.Path} {options.Filter}");
         watcher.EnableRaisingEvents = false;
       }
@@ -95,9 +99,9 @@ namespace log_forwarder
 
     private static void OnChanged(object sender, FileSystemEventArgs e)
     {
-      Console.WriteLine($"start forward files from {e.FullPath} because of {e.ChangeType.ToString()}");
       if(e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
       {
+        Console.WriteLine($"start forward files from {e.FullPath} because of {e.ChangeType.ToString()}");
         var parent = Directory.GetParent(e.FullPath).ToString();
         ExportAllFiles(parent);
       }
@@ -172,8 +176,8 @@ namespace log_forwarder
       {
         if(exportComplete)
         {
-          Console.WriteLine($" and cleaned");
           Directory.Delete(currentDir, true);
+          Console.WriteLine($" and cleaned");
         }
         else
         {
@@ -195,6 +199,12 @@ namespace log_forwarder
     {
       Console.WriteLine("Exit");
       closing.Set();
-    }    
+    }
+
+    private static void MethodInvokedOnSigTerm(AssemblyLoadContext obj)
+    {
+      Console.WriteLine("Exit");
+      closing.Set();
+    }
   }
 }
