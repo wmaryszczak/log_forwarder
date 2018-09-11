@@ -21,6 +21,9 @@ class CommandlineOptions
   [Option('c', "connection_string", Required = false, HelpText = "Determine connection string valid for backend")]
   public string ConnectionString { get; set; }
 
+  [Option('w', "max_workers", Required = false, Default = 1, HelpText = "Maximum of workers which exports data in parallel")]
+  public int MaxWorkers { get; set; }
+  
   [Option('v', "verbose", Required = false, HelpText = "Open diagnostic channel")]
   public bool Verbose { get; set; }
 }

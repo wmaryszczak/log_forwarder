@@ -42,10 +42,10 @@ namespace :deploy do
       on roles(:app) do
         if(test("bash -l -c \"pgrep systemd\""))
           template "#{fetch(:application)}.service", "#{deploy_to}/current/#{fetch(:application)}.service"
-          execute "bash -l -c \"sudo ln -f #{deploy_to}/current/#{fetch(:application)}.service /etc/systemd/system/#{fetch(:application)}.service\""
+          execute "bash -l -c \"sudo systemctl daemon-reload && sudo ln -f #{deploy_to}/current/#{fetch(:application)}.service /etc/systemd/system/#{fetch(:application)}.service\""
         else
           template "#{fetch(:application)}.conf", "#{deploy_to}/current/#{fetch(:application)}.conf"
-          execute "bash -l -c \"sudo ln -f #{deploy_to}/current/#{fetch(:application)}.conf /etc/init/#{fetch(:application)}.conf\""
+          execute "bash -l -c \"sudo systemctl daemon-reload && sudo ln -f #{deploy_to}/current/#{fetch(:application)}.conf /etc/init/#{fetch(:application)}.conf\""
         end
       end
     end

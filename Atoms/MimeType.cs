@@ -10,6 +10,8 @@ namespace log_forwarder.Atoms
       {"txt", "text/plain"},
       {"json", "application/json"},
       {"xml", "text/xml"},
+      {"csv", "text/csv"},
+      {"ion", "text/ion"},
       {".htm", "text/html"},
       {".html", "text/html"},
       {".ion", "text/ion"},

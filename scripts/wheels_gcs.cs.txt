@@ -6,8 +6,12 @@ if(fileSegments[lastIndex] == "gzip")
   Options["content_encoding"] = fileSegments[lastIndex];
   Options["content_type"] = fileSegments[lastIndex - 1];
 }
-else
+else if(fileSegments[lastIndex].Length >= 3)
 {
   Options["content_type"] = fileSegments[lastIndex];
+}
+else
+{
+  Options["content_type"] = "txt";
 }
 Options["filename"] = new  System.IO.DirectoryInfo(FileInfo.DirectoryName).Name + '/' + FileInfo.Name;

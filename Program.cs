@@ -23,9 +23,8 @@ namespace log_forwarder
   class Program
   {
     private static readonly AutoResetEvent closing = new AutoResetEvent(false);
-    private static IBackend backend;
-    private static ScriptRunner<Dictionary<string, string>> scriptRunner;
     private static FileSystemWatcher watcher;
+    private static FileProcessor processor;
 
     static void Main(string[] args)
     {
@@ -44,8 +43,7 @@ namespace log_forwarder
         {
           options = opts;
         });
-        CreateBackend(options);
-        BuildScript(options);
+        CreateProcessor(options);
         CreateWatcher(options);
         ScanDirectories(options);
         Console.CancelKeyPress += new ConsoleCancelEventHandler(OnExit);
@@ -56,22 +54,32 @@ namespace log_forwarder
         Console.WriteLine($"stop watching for files is {options.Path} {options.Filter}");
         watcher.EnableRaisingEvents = false;
         watcher.Dispose();
+        processor.Dispose();
       }
     }
 
-    private static void CreateWatcher(CommandlineOptions options)
+    private static void CreateProcessor(CommandlineOptions options)
     {
-      watcher = new FileSystemWatcher(options.Path, options.Filter);
-      watcher.InternalBufferSize = 1024 * 100;
-      watcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName;
-      watcher.EnableRaisingEvents = true;
-      watcher.IncludeSubdirectories = true;
-      watcher.Changed += new FileSystemEventHandler(OnChanged);
-      watcher.Created += new FileSystemEventHandler(OnChanged);
-      watcher.Error += new ErrorEventHandler(WatcherError);
+      processor = new FileProcessor(
+        options.MaxWorkers,
+        CreateBackend(options),
+        BuildScript(options)
+      );
     }
 
-    private static void BuildScript(CommandlineOptions options)
+    private static IBackend CreateBackend(CommandlineOptions options)
+    {
+      switch (options.Backend)
+      {
+        case "gcs":
+          return new GCSBackend(options.DatabaseName);
+        case "dry":
+          return new DryBackend();
+      }
+      throw new NotSupportedException(options.Backend);
+    }
+
+    private static ScriptRunner<Dictionary<string, string>> BuildScript(CommandlineOptions options)
     {
       var scriptOptions = ScriptOptions.Default.
         WithImports("System.IO", "System.Linq").
@@ -81,22 +89,19 @@ namespace log_forwarder
         File.Exists(options.DataSourceScript) ? File.ReadAllText(options.DataSourceScript) : options.DataSourceScript,
         options: scriptOptions,
         globalsType: typeof(Data));
-      scriptRunner = script.CreateDelegate();
+      return script.CreateDelegate();
     }
 
-    private static void CreateBackend(CommandlineOptions options)
+
+    private static void CreateWatcher(CommandlineOptions options)
     {
-      switch (options.Backend)
-      {
-        case "gcs":
-          backend = new GCSBackend(options.DatabaseName);
-          break;
-        case "dry":
-          backend = new DryBackend();
-          break;
-        default:
-          throw new NotSupportedException(options.Backend);
-      }
+      watcher = new FileSystemWatcher(options.Path, options.Filter);
+      watcher.InternalBufferSize = 65536;
+      watcher.NotifyFilter = NotifyFilters.FileName;
+      watcher.EnableRaisingEvents = true;
+      watcher.IncludeSubdirectories = true;
+      watcher.Created += new FileSystemEventHandler(OnChanged);
+      watcher.Error += new ErrorEventHandler(WatcherError);
     }
 
     private static void OnChanged(object sender, FileSystemEventArgs e)
@@ -105,7 +110,7 @@ namespace log_forwarder
       {
         Console.WriteLine($"start forward files from {e.FullPath} because of {e.ChangeType.ToString()}");
         var parent = Directory.GetParent(e.FullPath).ToString();
-        ExportAllFiles(parent);
+        processor.EnqueueItem(parent);
       }
     }
 
@@ -118,93 +123,13 @@ namespace log_forwarder
       var subDirs = System.IO.Directory.GetDirectories(options.Path, "*", SearchOption.AllDirectories);
       foreach(var currentDir in subDirs)
       {
-        ExportAllFiles(currentDir);
-        Console.Error.WriteLine($"skipping {currentDir} because is not ready for sending files.");
-      }
-    }
-
-    private static void ExportAllFiles(string currentDir)
-    {
-      string[] files = null;
-      var exportedFilesCounter = 0;
-      var exportComplete = true;
-      try
-      {
-        if(Directory.Exists(currentDir))
-        {
-          files = System.IO.Directory.GetFiles(currentDir);
-        }
-      }
-      catch (UnauthorizedAccessException e)
-      {
-        Console.Error.WriteLine(e);
-        return;
-      }
-      catch (System.IO.DirectoryNotFoundException e)
-      {
-        Console.Error.WriteLine(e);
-        return;
-      }
-      if(files == null || files.Length == 0)
-      {
-        return;
-      }
-      if(!files.Any(f => Path.GetExtension(f).EndsWith("complete")))
-      {
-        Console.Error.WriteLine($"skipping {currentDir} because is not ready for sending files.");
-        return;
-      }
-      var dt = DateTime.UtcNow;
-      foreach (string file in files)
-      {
-        try
-        {
-          var fi = new System.IO.FileInfo(file);
-          if(fi.Length > 0)
-          {
-            var opts = new Dictionary<string, string> { };
-            var tmp = scriptRunner(new Data { FileInfo = fi, Options = opts }).Result;
-            Export(fi.FullName, opts);
-            File.Delete(fi.FullName);
-            exportedFilesCounter++;
-          }
-        }
-        catch (System.IO.FileNotFoundException e)
-        {
-          Console.Error.WriteLine(e);
-          exportComplete = false;
-          continue;
-        }
-      }
-      var tt = (DateTime.UtcNow - dt).TotalMilliseconds.ToString(CultureInfo.InvariantCulture);
-      Console.Write($"{exportedFilesCounter}/{files.Length} have been exported in [{tt}] ms");
-      try
-      {
-        if(exportComplete)
-        {
-          Directory.Delete(currentDir, true);
-          Console.WriteLine($" and cleaned");
-        }
-        else
-        {
-          Console.WriteLine($" and left incomplete");
-        }
-      }
-      catch(Exception ex)
-      {
-        Console.Error.WriteLine(ex);
+        processor.EnqueueItem(currentDir);
       }
     }
 
     private static void WatcherError(object sender, ErrorEventArgs e)
     {
       Console.Error.WriteLine(e.GetException());
-    }
-
-
-    private static void Export(string fullPath, Dictionary<string, string> options)
-    {
-      backend.Send(fullPath, options);
     }
 
     private static void OnExit(object sender, ConsoleCancelEventArgs args)
