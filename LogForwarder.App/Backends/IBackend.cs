@@ -6,7 +6,6 @@ namespace log_forwarder.Backends
 {
   public interface IBackend
   {
-    Task SendAsync(string FullPath, Dictionary<string, string> options);
     void Send(string FullPath, Dictionary<string, string> options);
   }
 }

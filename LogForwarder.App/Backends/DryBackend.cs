@@ -8,12 +8,6 @@ namespace log_forwarder.Backends
 {
   public class DryBackend : IBackend
   {
-    public Task SendAsync(string fullPath, Dictionary<string, string> options)
-    {
-      Send(fullPath, options);
-      return Task.FromResult(true);
-    }
-
     public void Send(string fullPath, Dictionary<string, string> options)
     {
       foreach (var kvp in options)
