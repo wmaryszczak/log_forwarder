@@ -101,12 +101,11 @@ namespace log_forwarder
         try
         {
           var fi = new System.IO.FileInfo(file);
-          if (fi.Length > 0)
+          if (fi.Length > 0 && !fi.Attributes.HasFlag(FileAttributes.Hidden))
           {
             var opts = new Dictionary<string, string> { };
             var tmp = scriptRunner(new Data { FileInfo = fi, Options = opts }).Result;
             Export(fi.FullName, opts);
-            File.Delete(fi.FullName);
             exportedFilesCounter++;
           }
         }
@@ -121,7 +120,7 @@ namespace log_forwarder
       var msg = $"{exportedFilesCounter}/{files.Length} have been exported in [{tt}] ms";
       try
       {
-        if (exportComplete)
+        if (exportComplete && System.IO.Directory.GetFiles(item).All(f => Path.GetExtension(f).EndsWith("complete")))
         {
           Directory.Delete(item, true);
           Trace($"{msg} and cleaned");

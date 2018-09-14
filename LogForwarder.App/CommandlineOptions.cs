@@ -24,6 +24,9 @@ class CommandlineOptions
   [Option('w', "max_workers", Required = false, Default = 1, HelpText = "Maximum of workers which exports data in parallel")]
   public int MaxWorkers { get; set; }
   
+  [Option('r', "dry", Required = false, Default = false, HelpText = "Dry run, which do not forward logs and do not clean log")]
+  public bool Dry { get; set; }
+
   [Option('v', "verbose", Required = false, HelpText = "Open diagnostic channel")]
   public bool Verbose { get; set; }
 }

@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Google.Apis.Storage.v1.Data;
+using Google.Apis.Upload;
 using Google.Cloud.Storage.V1;
 
 namespace log_forwarder.Backends
@@ -10,6 +12,8 @@ namespace log_forwarder.Backends
   {
     private readonly StorageClient client;
     private readonly string bucket;
+    private readonly bool dry;
+    IProgress<IUploadProgress> progress;
 
     private readonly UploadObjectOptions opts = new UploadObjectOptions
     {
@@ -18,10 +22,20 @@ namespace log_forwarder.Backends
     };
 
 
-    public GCSBackend(string bucket)
+    public GCSBackend(string bucket, bool dry)
     {
       this.client = this.client = StorageClient.Create();
       this.bucket = bucket;
+      this.dry = dry;
+      this.progress = new Progress<IUploadProgress>(
+        p =>
+        {
+          if (p.Exception != null)
+          {
+            Console.WriteLine(p.Exception);
+          }
+        }
+      );
     }
 
     public void Send(string fullPath, Dictionary<string, string> options)
@@ -30,14 +44,22 @@ namespace log_forwarder.Backends
       var fileName = options["filename"];
       var contentType = Atoms.MimeType.GetMimeType(GetValue(options, "content_type"));
       var contentEncoding = GetValue(options, "content_encoding");
-      var obj = new Object 
+      var obj = new Google.Apis.Storage.v1.Data.Object 
       { 
         Name = fileName,
         ContentType = contentType,
         ContentEncoding = contentEncoding,
         Bucket = bucketName,        
       };
-      client.UploadObject(obj, File.OpenRead(fullPath), this.opts);
+      if(dry)
+      {
+        Console.WriteLine($"DRY: push {fullPath}");
+      }
+      else
+      {
+        client.UploadObject(obj, File.OpenRead(fullPath), this.opts, progress);
+        File.Delete(fullPath);
+      }
     }
 
     private string GetValue(Dictionary<string, string> options, string key)

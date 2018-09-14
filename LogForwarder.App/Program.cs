@@ -72,9 +72,7 @@ namespace log_forwarder
       switch (options.Backend)
       {
         case "gcs":
-          return new GCSBackend(options.DatabaseName);
-        case "dry":
-          return new DryBackend();
+          return new GCSBackend(options.DatabaseName, options.Dry);
       }
       throw new NotSupportedException(options.Backend);
     }
