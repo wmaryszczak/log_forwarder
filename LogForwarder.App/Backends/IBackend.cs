@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace log_forwarder.Backends
+namespace LogForwarder.App.Backends
 {
   public interface IBackend
   {

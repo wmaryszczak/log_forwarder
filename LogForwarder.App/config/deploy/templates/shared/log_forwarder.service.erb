@@ -7,8 +7,9 @@ User=resfinity
 EnvironmentFile=/etc/environment
 Environment=GOOGLE_APPLICATION_CREDENTIALS=/opt/wheels/current/anixe-extra.json
 Environment=ASPNETCORE_ENVIRONMENT=<%= fetch(:stage) %>
+Environment=ASPNETCORE_URLS=http://0.0.0.0:5002
 WorkingDirectory=<%= fetch(:deploy_to) %>/current/
-ExecStart=/usr/share/dotnet/dotnet <%= fetch(:application) %>.dll -p /var/log/resfinity/wheels/ -f .complete -s scripts/wheels_gcs.cs.txt -w 4 -b gcs -v
+ExecStart=/usr/share/dotnet/dotnet LogForwarder.App.dll -p /var/log/resfinity/wheels/ -f .complete -s scripts/wheels_gcs.cs.txt -w 6 -b gcs -v
 Restart=always
 
 [Install]

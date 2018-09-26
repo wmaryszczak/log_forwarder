@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LogForwarder.App\log_forwarder.csproj" />
+    <ProjectReference Include="..\LogForwarder.App\LogForwarder.App.csproj" />
   </ItemGroup>
 
 </Project>

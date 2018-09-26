@@ -6,20 +6,22 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using log_forwarder.Backends;
+using LogForwarder.App.Backends;
+using LogForwarder.App.Models;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 
-namespace log_forwarder
+namespace LogForwarder.App
 {
-  class FileProcessor : IDisposable
+  class FileProcessor : IProcessorStatusReporter, IDisposable
   {
-    private Task[] workers;
+    private Worker[] workers;
     private CancellationTokenSource cancellationTokenSource;
     private CancellationToken cancellationToken;
     private readonly BlockingCollection<string> items = new BlockingCollection<string>();
     private readonly IBackend backend;
     private readonly ScriptRunner<Dictionary<string, string>> scriptRunner;
+    private int EnqueuedItemCount;
 
     public FileProcessor(int maxWorkers, IBackend backend, ScriptRunner<Dictionary<string, string>> scriptRunner)
     {
@@ -30,31 +32,37 @@ namespace log_forwarder
 
     private void InitBackgroundThread(int maxWorkers)
     {
-      this.workers = new Task[maxWorkers];
+      this.workers = new Worker[maxWorkers];
       this.cancellationTokenSource = new CancellationTokenSource();
       this.cancellationToken = this.cancellationTokenSource.Token;
 
       for (int i = 0; i < maxWorkers; i++)
       {
-        this.workers[i] = Task.Factory.StartNew(() =>
-        {
-          Work();
-        }, this.cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        var worker = new Worker { Name = $"#{i}wrk" };
+        Task.Factory.StartNew(Work, worker, this.cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        workers[i] = worker;
       }
     }
 
     public void EnqueueItem(string FileName)
     {
+      EnqueuedItemCount++;
       items.Add(FileName);
     }
 
-    private void Work()
+    private void Work(object state)
     {
+      var wrk = state as Worker;
       while (true)
       {
+        wrk.IsWaiting = true;
         if (this.items.TryTake(out var item, 10, this.cancellationToken) && !string.IsNullOrEmpty(item))
         {
-          ProcessItem(item);
+          wrk.IsWaiting = false;
+          var tt = ProcessItem(item);
+          wrk.ProcessedItem++;
+          wrk.LastProcessedTime = DateTime.Now;
+          wrk.LastProcessedTimeTaken = tt;
         }
         if (this.cancellationToken.IsCancellationRequested)
         {
@@ -63,9 +71,10 @@ namespace log_forwarder
       }
     }
 
-    private void ProcessItem(string item)
+    private double ProcessItem(string item)
     {
       Trace($"Peek {item}");
+      var tt = 0.0;
       string[] files = null;
       var exportedFilesCounter = 0;
       var exportComplete = true;
@@ -79,25 +88,29 @@ namespace log_forwarder
       catch (UnauthorizedAccessException e)
       {
         Error(e);
-        return;
+        return tt;
       }
       catch (System.IO.DirectoryNotFoundException e)
       {
         Error(e);
-        return;
+        return tt;
       }
       if (files == null || files.Length == 0)
       {
-        return;
+        return tt;
       }
       if (!files.Any(f => Path.GetExtension(f).EndsWith("complete")))
       {
         Trace($"skipping {item} because is not ready for sending files.");
-        return;
+        return tt;
       }
       var dt = DateTime.UtcNow;
       foreach (string file in files)
       {
+        if (this.cancellationToken.IsCancellationRequested)
+        {
+          break;
+        }
         try
         {
           var fi = new System.IO.FileInfo(file);
@@ -109,15 +122,15 @@ namespace log_forwarder
             exportedFilesCounter++;
           }
         }
-        catch (System.IO.FileNotFoundException e)
+        catch (Exception e)
         {
           Error(e);
           exportComplete = false;
           continue;
         }
       }
-      var tt = (DateTime.UtcNow - dt).TotalMilliseconds.ToString(CultureInfo.InvariantCulture);
-      var msg = $"{exportedFilesCounter}/{files.Length} have been exported in [{tt}] ms";
+      tt = (DateTime.UtcNow - dt).TotalMilliseconds;
+      var msg = $"{exportedFilesCounter}/{files.Length} have been exported in [{tt.ToString(CultureInfo.InvariantCulture)}] ms";
       try
       {
         if (exportComplete && System.IO.Directory.GetFiles(item).All(f => Path.GetExtension(f).EndsWith("complete")))
@@ -127,18 +140,30 @@ namespace log_forwarder
         }
         else
         {
-          Trace($"{msg} and left incomplete");
+          var count = System.IO.Directory.GetFiles(item).Count(f => !Path.GetExtension(f).EndsWith("complete"));
+          Trace($"{msg} and {count} files left incomplete");
         }
       }
       catch (Exception ex)
       {
         Error(ex);
       }
+      return tt;
     }
 
     private void Export(string fullPath, Dictionary<string, string> options)
     {
       backend.Send(fullPath, options);
+    }
+
+    public ProcessorStatus GetStatus()
+    {
+      return new ProcessorStatus 
+      { 
+        EnqueuedItemCount = this.EnqueuedItemCount,
+        ElementsInQueue = this.items.Count,
+        Workers = this.workers
+      };
     }
 
     #region IDisposable Members

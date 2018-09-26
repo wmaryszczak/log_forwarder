@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace log_forwarder.Atoms
+namespace LogForwarder.App.Atoms
 {
   public static class MimeType
   {

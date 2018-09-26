@@ -6,7 +6,7 @@ using Google.Apis.Storage.v1.Data;
 using Google.Apis.Upload;
 using Google.Cloud.Storage.V1;
 
-namespace log_forwarder.Backends
+namespace LogForwarder.App.Backends
 {
   public class GCSBackend : IBackend
   {
@@ -24,18 +24,21 @@ namespace log_forwarder.Backends
 
     public GCSBackend(string bucket, bool dry)
     {
-      this.client = this.client = StorageClient.Create();
+      if(!dry)
+      {
+        this.client = this.client = StorageClient.Create();
+        this.progress = new Progress<IUploadProgress>(
+          p =>
+          {
+            if (p.Exception != null)
+            {
+              Console.WriteLine(p.Exception);
+            }
+          }
+        );
+      }
       this.bucket = bucket;
       this.dry = dry;
-      this.progress = new Progress<IUploadProgress>(
-        p =>
-        {
-          if (p.Exception != null)
-          {
-            Console.WriteLine(p.Exception);
-          }
-        }
-      );
     }
 
     public void Send(string fullPath, Dictionary<string, string> options)
