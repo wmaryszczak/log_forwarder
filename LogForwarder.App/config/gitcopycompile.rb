@@ -52,7 +52,7 @@ class Capistrano::GitCopy < Capistrano::SCM
     end
 
     def release
-      system fetch(:publish_cmd)
+      raise "Publish Error" unless system fetch(:publish_cmd)
       system "cd #{fetch(:publish_dir)} && tar -czvf #{local_tarfile} ."
     end
   end

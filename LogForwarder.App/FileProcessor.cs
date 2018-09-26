@@ -76,7 +76,7 @@ namespace LogForwarder.App
       Trace($"Peek {item}");
       var tt = 0.0;
       string[] files = null;
-      var exportedFilesCounter = 0;
+      var processedFilesCounter = 0;
       var exportComplete = true;
       try
       {
@@ -119,7 +119,7 @@ namespace LogForwarder.App
             var opts = new Dictionary<string, string> { };
             var tmp = scriptRunner(new Data { FileInfo = fi, Options = opts }).Result;
             Export(fi.FullName, opts);
-            exportedFilesCounter++;
+            processedFilesCounter++;
           }
         }
         catch (Exception e)
@@ -130,10 +130,10 @@ namespace LogForwarder.App
         }
       }
       tt = (DateTime.UtcNow - dt).TotalMilliseconds;
-      var msg = $"{exportedFilesCounter}/{files.Length} have been exported in [{tt.ToString(CultureInfo.InvariantCulture)}] ms";
+      var msg = $"{processedFilesCounter}/{files.Length} have been exported in [{tt.ToString(CultureInfo.InvariantCulture)}] ms";
       try
       {
-        if (exportComplete && System.IO.Directory.GetFiles(item).All(f => Path.GetExtension(f).EndsWith("complete")))
+        if (exportComplete)
         {
           Directory.Delete(item, true);
           Trace($"{msg} and cleaned");
