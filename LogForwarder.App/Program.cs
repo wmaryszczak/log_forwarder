@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using CommandLine;
 using LogForwarder.App.Backends;
 using LogForwarder.App.Models;
+using LogForwarder.App.Processors;
+using LogForwarder.App.Watchers;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
@@ -18,8 +20,8 @@ namespace LogForwarder.App
 {
   public class Program
   {
-    private static FileWatcher watcher;
-    private static FileProcessor processor;
+    private static IWatcher watcher;
+    private static IProcessor processor;
 
     public static void Main(string[] args)
     {
@@ -62,11 +64,25 @@ namespace LogForwarder.App
 
     private static void CreateProcessor(CommandlineOptions options)
     {
-      processor = new FileProcessor(
-        options.MaxWorkers,
-        CreateBackend(options),
-        BuildScript(options)
-      );
+      switch (options.Mode)
+      {
+        case "files": 
+          processor = new FileProcessor(
+            options.MaxWorkers,
+            CreateBackend(options),
+            BuildScript<Data>(options));
+          break;
+        case "single_file": 
+          processor = new SingleFileProcessor(
+            options.MaxWorkers,
+            CreateBackend(options),
+            BuildScript<SingleLineData>(options),
+            options.Path
+          );
+          break;
+        default:
+          throw new NotSupportedException(options.Mode);
+      }
     }
 
     private static IBackend CreateBackend(CommandlineOptions options)
@@ -79,7 +95,7 @@ namespace LogForwarder.App
       throw new NotSupportedException(options.Backend);
     }
 
-    private static ScriptRunner<Dictionary<string, string>> BuildScript(CommandlineOptions options)
+    private static ScriptRunner<Dictionary<string, string>> BuildScript<T>(CommandlineOptions options)
     {
       var scriptOptions = ScriptOptions.Default.
         WithImports("System.IO", "System.Linq").
@@ -88,20 +104,30 @@ namespace LogForwarder.App
       var script = CSharpScript.Create<Dictionary<string, string>>(
         File.Exists(options.DataSourceScript) ? File.ReadAllText(options.DataSourceScript) : options.DataSourceScript,
         options: scriptOptions,
-        globalsType: typeof(Data));
+        globalsType: typeof(T));
       return script.CreateDelegate();
     }
 
 
     private static void CreateWatcher(CommandlineOptions options)
     {
-      watcher = new FileWatcher(options.Path, options.Filter);
+      switch (options.Mode)
+      {
+        case "files": 
+          watcher = new FileWatcher(options.Path, options.Filter);
+          break;
+        case "single_file": 
+          watcher = new SingleFileWatcher(options.Path, options.Filter);
+          break;
+        default:
+          throw new NotSupportedException(options.Mode);
+      }
       watcher.OnFile += OnFile;
     }
 
-    private static void OnFile(string path)
+    private static void OnFile(string path, string data)
     {
-      processor.EnqueueItem(path);
+      processor.EnqueueItem(path, data);
     }
 
     private static void ScanDirectories(CommandlineOptions options)
@@ -113,7 +139,7 @@ namespace LogForwarder.App
       var subDirs = System.IO.Directory.GetDirectories(options.Path, "*", SearchOption.AllDirectories);
       foreach (var currentDir in subDirs)
       {
-        processor.EnqueueItem(currentDir);
+        processor.EnqueueItem(currentDir, null);
       }
     }
   }

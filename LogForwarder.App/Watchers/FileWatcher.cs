@@ -2,12 +2,12 @@ using System;
 using System.IO;
 using LogForwarder.App.Models;
 
-namespace LogForwarder.App
+namespace LogForwarder.App.Watchers
 {
-  public class FileWatcher : IWatcherStatusReporter, IDisposable
+  public class FileWatcher : IWatcher
   {
     private FileSystemWatcher watcher;
-    public event Action<string> OnFile;
+    public event Action<string, string> OnFile;
     private Exception lastError;
     private DateTime? lastErrorTime;
     private DateTime lastEventTime;
@@ -35,7 +35,7 @@ namespace LogForwarder.App
         var parent = Directory.GetParent(e.FullPath).ToString();
         if(this.OnFile != null)
         {
-          this.OnFile(parent);
+          this.OnFile(parent, null);
         }
       }
     }

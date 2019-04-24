@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Google.Apis.Storage.v1.Data;
 using Google.Apis.Upload;
 using Google.Cloud.Storage.V1;
+using LogForwarder.App.Atoms;
 
 namespace LogForwarder.App.Backends
 {
@@ -20,7 +21,6 @@ namespace LogForwarder.App.Backends
       Projection = Projection.NoAcl,
       ChunkSize = UploadObjectOptions.MinimumChunkSize * 10
     };
-
 
     public GCSBackend(string bucket, bool dry)
     {
@@ -41,37 +41,36 @@ namespace LogForwarder.App.Backends
       this.dry = dry;
     }
 
-    public void Send(string fullPath, Dictionary<string, string> options)
+    public void Send(FileLogInfo file)
     {
-      var bucketName = this.bucket ?? options["bucket"];
-      var fileName = options["filename"];
-      var contentType = Atoms.MimeType.GetMimeType(GetValue(options, "content_type"));
-      var contentEncoding = GetValue(options, "content_encoding");
+      var bucketName = this.bucket ?? file.Bucket;
+
+      if (string.IsNullOrEmpty(bucketName))
+      {
+        return;
+      }
+
+      var contentType = Atoms.MimeType.GetMimeType(file.ContentType);
+      var contentEncoding = file.ContentEncoding;
+
       var obj = new Google.Apis.Storage.v1.Data.Object 
       { 
-        Name = fileName,
+        Name = file.FileName,
         ContentType = contentType,
         ContentEncoding = contentEncoding,
-        Bucket = bucketName,        
+        Bucket = bucketName,
       };
       if(dry)
       {
-        Console.WriteLine($"DRY: push {fullPath}");
+        Console.WriteLine($"DRY: push {file.FileName}");
+        var sReader = new StreamReader(file.Content);
+        var content = sReader.ReadToEnd();
+        Console.WriteLine(content);
       }
       else
       {
-        client.UploadObject(obj, File.OpenRead(fullPath), this.opts, progress);
-        File.Delete(fullPath);
+        client.UploadObject(obj, file.Content, this.opts, progress);
       }
-    }
-
-    private string GetValue(Dictionary<string, string> options, string key)
-    {
-      if(options.TryGetValue(key, out var val))
-      {
-        return val;
-      }
-      return null;
     }
   }
 }
