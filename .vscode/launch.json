@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": ".NET Core Launch (console)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceRoot}/LogForwarder.App/bin/Debug/netcoreapp2.1/LogForwarder.App.dll",
+      "args": [
+        "-p/src/log/resfinity/wheels/", 
+        "-f*.log",
+        "-sscripts/single_file_wheels_gcs.cs.txt", 
+        "-bgcs", 
+        "-w4",
+        "-msingle_file"
+      ],
+      "cwd": "${workspaceRoot}/LogForwarder.App",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/src/log_forwarder/LogForwarder.App/anixe-extra.json",
+        "ASPNETCORE_URLS": "http://0.0.0.0:5002"
+      }
+    }
+  ]
+}

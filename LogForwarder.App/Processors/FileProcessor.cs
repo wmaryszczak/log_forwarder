@@ -6,14 +6,15 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using LogForwarder.App.Atoms;
 using LogForwarder.App.Backends;
 using LogForwarder.App.Models;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 
-namespace LogForwarder.App
+namespace LogForwarder.App.Processors
 {
-  class FileProcessor : IProcessorStatusReporter, IDisposable
+  class FileProcessor : IProcessor
   {
     private Worker[] workers;
     private CancellationTokenSource cancellationTokenSource;
@@ -44,7 +45,7 @@ namespace LogForwarder.App
       }
     }
 
-    public void EnqueueItem(string FileName)
+    public void EnqueueItem(string FileName, string data)
     {
       EnqueuedItemCount++;
       items.Add(FileName);
@@ -153,7 +154,27 @@ namespace LogForwarder.App
 
     private void Export(string fullPath, Dictionary<string, string> options)
     {
-      backend.Send(fullPath, options);
+      FileLogInfo fli = null;
+      try
+      {
+        using (fli = new FileLogInfo(options, File.OpenRead(fullPath)))
+        {
+          backend.Send(fli);
+        }
+      } 
+      finally 
+      {
+        File.Delete(fullPath);
+      }
+    }
+
+    private string GetValue(Dictionary<string, string> options, string key)
+    {
+      if(options.TryGetValue(key, out var val))
+      {
+        return val;
+      }
+      return null;
     }
 
     public ProcessorStatus GetStatus()

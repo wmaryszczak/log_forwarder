@@ -1,0 +1,28 @@
+var rid = Properties[1];
+var tid = Properties[2];
+var mid = Properties[3];
+var dir = Properties[4];
+var tenant = Properties[5];
+var tname = Properties[6];
+var contentType = Properties[7];
+var contentEncoding = Properties[8];
+
+string ext = "txt";
+
+if (contentType.Contains("xml", System.StringComparison.InvariantCultureIgnoreCase))
+{
+  ext = "xml";
+}
+else if (contentType.Contains("json", System.StringComparison.InvariantCultureIgnoreCase))
+{
+  ext = "json";
+}
+
+if (!string.IsNullOrEmpty(tenant))
+{
+  Options["bucket"] = $"anixe-car-{tenant}";
+}
+
+Options["filename"] = $"{rid}/{mid}.{tid}.{tname}.{dir}.{ext}";
+Options["content_type"] = contentType;
+Options["content_encoding"] = contentEncoding;

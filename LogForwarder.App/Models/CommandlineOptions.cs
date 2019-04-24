@@ -29,4 +29,7 @@ class CommandlineOptions
 
   [Option('v', "verbose", Required = false, HelpText = "Open diagnostic channel")]
   public bool Verbose { get; set; }
+
+  [Option('m', "mode", Required = false, Default = "files", HelpText = "Determine which watchers should be used (files, single_file)")]
+  public string Mode { get; set; }
 }
