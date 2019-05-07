@@ -8,7 +8,7 @@ ASPNETCORE_URLS=http://0.0.0.0:5002 dotnet run -- -p /var/log/resfinity/wheels/ 
 ## Dry run for single file mode
 
 ```
-ASPNETCORE_URLS=http://0.0.0.0:5002 dotnet run -- -p /var/log/resfinity/wheels/ -f "*.log" -b gcs --dry -w 4 -m single_file
+ASPNETCORE_URLS=http://0.0.0.0:5002 dotnet run -- -p /var/log/resfinity/wheels/ -f "*.log" -b gcs --dry -w 4 -m single_file -s scripts/single_file_wheels_gcs.cs.txt 
 ```
 
 ## GCS run
@@ -25,7 +25,7 @@ ASPNETCORE_URLS=http://0.0.0.0:5002 dotnet run -- -p /var/log/resfinity/wheels/ 
 GOOGLE_APPLICATION_CREDENTIALS environment variable must be provided
 
 ```
-ASPNETCORE_URLS=http://0.0.0.0:5002 dotnet run -- -p /var/log/resfinity/wheels/ -f "*.log" -b gcs -w 4 -m single_file
+ASPNETCORE_URLS=http://0.0.0.0:5002 dotnet run -- -p /var/log/resfinity/wheels/ -f "*.log" -b gcs -w 4 -m single_file -s scripts/single_file_wheels_gcs.cs.txt 
 ```
 
 ## Health check
