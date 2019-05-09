@@ -23,6 +23,14 @@ if (!string.IsNullOrEmpty(tenant))
   Options["bucket"] = $"anixe-car-{tenant}";
 }
 
-Options["filename"] = $"{rid}/{mid}.{tid}.{tname}.{dir}.{ext}";
+if (dir == "ex")
+{
+  Options["filename"] = $"{rid}/{tname}.{dir}.{tid}.{ext}";
+}
+else
+{
+  Options["filename"] = $"{rid}/{mid}.{tid}.{tname}.{dir}.{ext}";
+}
+
 Options["content_type"] = contentType;
 Options["content_encoding"] = contentEncoding;
